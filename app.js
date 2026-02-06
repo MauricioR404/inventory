@@ -16,7 +16,6 @@ const productsList = document.getElementById('productsList');
 const emptyState = document.getElementById('emptyState');
 const alertArea = document.getElementById('alertArea');
 const totalProducts = document.getElementById('totalProducts');
-const totalValue = document.getElementById('totalValue');
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -28,53 +27,87 @@ document.addEventListener('DOMContentLoaded', () => {
 startScanBtn.addEventListener('click', startScanner);
 stopScanBtn.addEventListener('click', stopScanner);
 
-function startScanner() {
+async function startScanner() {
     if (isScanning) return;
 
-    html5QrCode = new Html5Qrcode("reader");
-    
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.777778,
-        // Configuración mejorada para mejor calidad
-        videoConstraints: {
-            width: { min: 640, ideal: 1920, max: 1920 },
-            height: { min: 480, ideal: 1080, max: 1080 },
-            facingMode: "environment",
-            focusMode: "continuous"
-        },
-        // Configurar para evitar borrosidad
-        disableFlip: false
-    };
+    try {
+        // Check if camera is available
+        const devices = await Html5Qrcode.getCameras();
+        
+        if (!devices || devices.length === 0) {
+            showAlert('❌ No se detectó ninguna cámara en este dispositivo. Por favor ingresa el código manualmente.', 'error');
+            return;
+        }
 
-    html5QrCode.start(
-        { facingMode: "environment" },
-        config,
-        onScanSuccess,
-        onScanError
-    ).then(() => {
+        html5QrCode = new Html5Qrcode("reader");
+        
+        const config = {
+            fps: 10,
+            qrbox: { width: 250, height: 150 },
+            aspectRatio: 1.777778,
+            // Configuración mejorada para mejor calidad
+            videoConstraints: {
+                width: { min: 640, ideal: 1920, max: 1920 },
+                height: { min: 480, ideal: 1080, max: 1080 },
+                facingMode: "environment",
+                focusMode: "continuous"
+            },
+            // Configurar para evitar borrosidad
+            disableFlip: false
+        };
+
+        // Try to use back camera first, if not available use any camera
+        const cameraId = devices.length > 1 ? devices[1].id : devices[0].id;
+
+        await html5QrCode.start(
+            cameraId,
+            config,
+            onScanSuccess,
+            onScanError
+        );
+        
         isScanning = true;
         startScanBtn.classList.add('hidden');
         stopScanBtn.classList.remove('hidden');
-        showAlert('Escáner activado. Apunta la cámara al código de barras', 'info');
-    }).catch(err => {
+        showAlert('✅ Escáner activado. Apunta la cámara al código de barras', 'info');
+        
+    } catch (err) {
         console.error('Error al iniciar el escáner:', err);
-        showAlert('Error al iniciar la cámara. Verifica los permisos.', 'error');
-    });
+        
+        let errorMessage = '❌ Error al iniciar la cámara. ';
+        
+        if (err.name === 'NotFoundError') {
+            errorMessage += 'No se encontró ninguna cámara. Ingresa el código manualmente.';
+        } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            errorMessage += 'Permisos de cámara denegados. Por favor permite el acceso a la cámara en la configuración de tu navegador.';
+        } else if (err.name === 'NotReadableError') {
+            errorMessage += 'La cámara está siendo usada por otra aplicación. Cierra otras apps que usen la cámara.';
+        } else if (err.name === 'OverconstrainedError') {
+            errorMessage += 'No se pudo configurar la cámara. Intenta con otro navegador.';
+        } else {
+            errorMessage += 'Verifica los permisos y que estés usando HTTPS. Error: ' + err.message;
+        }
+        
+        showAlert(errorMessage, 'error');
+    }
 }
 
-function stopScanner() {
+async function stopScanner() {
     if (!html5QrCode || !isScanning) return;
 
-    html5QrCode.stop().then(() => {
+    try {
+        await html5QrCode.stop();
         isScanning = false;
         startScanBtn.classList.remove('hidden');
         stopScanBtn.classList.add('hidden');
         showAlert('Escáner detenido', 'info');
-    }).catch(err => {
+    } catch (err) {
         console.error('Error al detener el escáner:', err);
-    });
+        // Force reset the state even if stop fails
+        isScanning = false;
+        startScanBtn.classList.remove('hidden');
+        stopScanBtn.classList.add('hidden');
+    }
 }
 
 function onScanSuccess(decodedText, decodedResult) {
@@ -83,16 +116,20 @@ function onScanSuccess(decodedText, decodedResult) {
     // Set the code in the input field
     codeInput.value = decodedText;
     
-    // Check if product already exists
+    // Check if product already exists - THIS IS THE KEY VALIDATION
     const products = getProducts();
     const existingProduct = products.find(p => p.code === decodedText);
     
     if (existingProduct) {
-        showAlert(`⚠️ El producto "${existingProduct.name}" con código ${decodedText} ya está registrado`, 'warning');
+        // PRODUCTO DUPLICADO - Mostrar alerta prominente
+        showAlert(`🚫 DUPLICADO: El producto "${existingProduct.name}" con código ${decodedText} YA ESTÁ REGISTRADO`, 'error');
         // Stop scanner automatically when duplicate is found
         stopScanner();
+        // Clear the form
+        productForm.reset();
     } else {
-        showAlert(`✓ Código ${decodedText} escaneado correctamente. Completa la información del producto.`, 'success');
+        // PRODUCTO NUEVO - Permitir registro
+        showAlert(`✅ NUEVO: Código ${decodedText} detectado. Completa la información para registrarlo.`, 'success');
         // Focus on name input
         nameInput.focus();
     }
@@ -126,11 +163,11 @@ function saveProduct() {
 
     const products = getProducts();
     
-    // Check if product with this code already exists
+    // VALIDACIÓN CRÍTICA: Check if product with this code already exists
     const existingProduct = products.find(p => p.code === code);
     
     if (existingProduct) {
-        showAlert(`❌ El producto con código ${code} ya existe: "${existingProduct.name}"`, 'error');
+        showAlert(`🚫 DUPLICADO: Ya existe un producto con el código ${code}: "${existingProduct.name}". No se puede agregar.`, 'error');
         return;
     }
 
@@ -154,7 +191,7 @@ function saveProduct() {
     loadProducts();
     updateStatistics();
     
-    showAlert(`✅ Producto "${name}" guardado exitosamente`, 'success');
+    showAlert(`✅ REGISTRADO: Producto "${name}" guardado exitosamente`, 'success');
     
     // If scanner is running, stop it
     if (isScanning) {
@@ -228,10 +265,8 @@ function loadProducts() {
 function updateStatistics() {
     const products = getProducts();
     const total = products.length;
-    const totalVal = products.reduce((sum, p) => sum + p.price, 0);
     
     totalProducts.textContent = total;
-    totalValue.textContent = `$${totalVal.toFixed(2)}`;
 }
 
 function showAlert(message, type = 'info') {
