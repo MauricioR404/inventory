@@ -12,12 +12,25 @@
         <!-- Header -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6">
             <h1 class="text-3xl font-bold text-gray-800 text-center">📦 Escáner de Productos</h1>
-            <p class="text-gray-600 text-center mt-2">Escanea códigos de barras y gestiona tu inventario</p>
+            <p class="text-gray-600 text-center mt-2">Escanea y valida que no haya productos duplicados</p>
         </div>
 
         <!-- Scanner Section -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6">
             <h2 class="text-xl font-semibold text-gray-800 mb-4">Escáner de Código de Barras</h2>
+            
+            <!-- Tips for better scanning -->
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4 rounded">
+                <p class="text-sm text-blue-800 font-semibold mb-2">💡 Consejos para escaneo perfecto:</p>
+                <ul class="text-sm text-blue-700 space-y-1 ml-4">
+                    <li>• <strong>Distancia:</strong> 10-20 cm entre el código y la cámara</li>
+                    <li>• <strong>Iluminación:</strong> Luz brillante, evita sombras sobre el código</li>
+                    <li>• <strong>Estabilidad:</strong> Mantén el teléfono quieto 2-3 segundos</li>
+                    <li>• <strong>Limpieza:</strong> Limpia la lente de la cámara</li>
+                    <li>• <strong>Enfoque:</strong> Toca la pantalla sobre el código para enfocar</li>
+                    <li>• <strong>Ángulo:</strong> Mantén el código perpendicular a la cámara</li>
+                </ul>
+            </div>
             
             <div id="reader" class="mb-4 rounded-lg overflow-hidden border-2 border-gray-300"></div>
             
@@ -93,15 +106,10 @@
         <!-- Statistics -->
         <div class="bg-white rounded-lg shadow-md p-6 mt-6">
             <h2 class="text-xl font-semibold text-gray-800 mb-4">📊 Estadísticas</h2>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="bg-blue-50 rounded-lg p-4 text-center">
-                    <p class="text-gray-600 text-sm">Total Productos</p>
-                    <p id="totalProducts" class="text-3xl font-bold text-blue-600">0</p>
-                </div>
-                <div class="bg-green-50 rounded-lg p-4 text-center">
-                    <p class="text-gray-600 text-sm">Valor Total</p>
-                    <p id="totalValue" class="text-3xl font-bold text-green-600">$0.00</p>
-                </div>
+            <div class="bg-blue-50 rounded-lg p-6 text-center">
+                <p class="text-gray-600 text-sm mb-2">Productos Registrados</p>
+                <p id="totalProducts" class="text-5xl font-bold text-blue-600">0</p>
+                <p class="text-gray-500 text-xs mt-2">Códigos únicos en el sistema</p>
             </div>
         </div>
     </div>

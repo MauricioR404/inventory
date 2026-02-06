@@ -1,6 +1,9 @@
 // App State
 let html5QrCode = null;
 let isScanning = false;
+let lastScannedCode = null;
+let lastScanTime = 0;
+const SCAN_COOLDOWN = 2000; // 2 segundos entre escaneos del mismo código
 
 // DOM Elements
 const reader = document.getElementById('reader');
@@ -41,35 +44,56 @@ async function startScanner() {
 
         html5QrCode = new Html5Qrcode("reader");
         
+        // Configuración MEJORADA para máxima calidad
         const config = {
-            fps: 10,
-            qrbox: { width: 250, height: 150 },
+            fps: 30, // Aumentado de 10 a 30 para mejor detección
+            qrbox: { width: 300, height: 180 }, // Área de escaneo más grande
             aspectRatio: 1.777778,
-            // Configuración mejorada para mejor calidad
+            // Configuración mejorada para ALTA calidad
             videoConstraints: {
-                width: { min: 640, ideal: 1920, max: 1920 },
-                height: { min: 480, ideal: 1080, max: 1080 },
-                facingMode: "environment",
-                focusMode: "continuous"
+                width: { min: 1280, ideal: 3840, max: 4096 }, // 4K ideal
+                height: { min: 720, ideal: 2160, max: 2160 }, // 4K ideal
+                facingMode: { exact: "environment" },
+                advanced: [
+                    { focusMode: "continuous" },
+                    { exposureMode: "continuous" },
+                    { whiteBalanceMode: "continuous" },
+                    { zoom: 1.0 }
+                ]
             },
-            // Configurar para evitar borrosidad
-            disableFlip: false
+            disableFlip: false,
+            // Formatos de códigos de barras soportados
+            formatsToSupport: [
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.QR_CODE
+            ]
         };
 
-        // Try to use back camera first, if not available use any camera
-        const cameraId = devices.length > 1 ? devices[1].id : devices[0].id;
+        // Usar la cámara trasera (mejor calidad)
+        const backCamera = devices.find(device => 
+            device.label.toLowerCase().includes('back') || 
+            device.label.toLowerCase().includes('rear') ||
+            device.label.toLowerCase().includes('trasera')
+        ) || devices[devices.length - 1];
 
         await html5QrCode.start(
-            cameraId,
+            backCamera.id,
             config,
             onScanSuccess,
             onScanError
         );
         
         isScanning = true;
+        lastScannedCode = null; // Reset al iniciar
+        lastScanTime = 0;
         startScanBtn.classList.add('hidden');
         stopScanBtn.classList.remove('hidden');
-        showAlert('✅ Escáner activado. Apunta la cámara al código de barras', 'info');
+        showAlert('✅ Escáner activado en ALTA calidad. Apunta la cámara al código de barras', 'info');
         
     } catch (err) {
         console.error('Error al iniciar el escáner:', err);
@@ -98,6 +122,8 @@ async function stopScanner() {
     try {
         await html5QrCode.stop();
         isScanning = false;
+        lastScannedCode = null; // Reset debouncing
+        lastScanTime = 0;
         startScanBtn.classList.remove('hidden');
         stopScanBtn.classList.add('hidden');
         showAlert('Escáner detenido', 'info');
@@ -105,12 +131,25 @@ async function stopScanner() {
         console.error('Error al detener el escáner:', err);
         // Force reset the state even if stop fails
         isScanning = false;
+        lastScannedCode = null;
+        lastScanTime = 0;
         startScanBtn.classList.remove('hidden');
         stopScanBtn.classList.add('hidden');
     }
 }
 
 function onScanSuccess(decodedText, decodedResult) {
+    const currentTime = Date.now();
+    
+    // DEBOUNCING: Si es el mismo código escaneado hace menos de 2 segundos, ignorar
+    if (decodedText === lastScannedCode && (currentTime - lastScanTime) < SCAN_COOLDOWN) {
+        return; // Ignorar escaneos repetidos muy rápidos
+    }
+    
+    // Actualizar último código escaneado
+    lastScannedCode = decodedText;
+    lastScanTime = currentTime;
+    
     console.log('Código escaneado:', decodedText);
     
     // Set the code in the input field
@@ -132,6 +171,12 @@ function onScanSuccess(decodedText, decodedResult) {
         showAlert(`✅ NUEVO: Código ${decodedText} detectado. Completa la información para registrarlo.`, 'success');
         // Focus on name input
         nameInput.focus();
+        // Pausar el escáner brevemente para que el usuario vea el código
+        setTimeout(() => {
+            if (isScanning) {
+                stopScanner();
+            }
+        }, 500);
     }
 }
 
