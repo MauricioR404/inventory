@@ -36,7 +36,16 @@ function startScanner() {
     const config = {
         fps: 10,
         qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.777778
+        aspectRatio: 1.777778,
+        // Configuración mejorada para mejor calidad
+        videoConstraints: {
+            width: { min: 640, ideal: 1920, max: 1920 },
+            height: { min: 480, ideal: 1080, max: 1080 },
+            facingMode: "environment",
+            focusMode: "continuous"
+        },
+        // Configurar para evitar borrosidad
+        disableFlip: false
     };
 
     html5QrCode.start(
