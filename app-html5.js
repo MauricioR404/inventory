@@ -35,16 +35,35 @@ async function startScanner() {
             return;
         }
         
-        // Buscar cámara trasera (back/rear) o usar la última
-        const backCamera = cameras.find(cam => 
-            cam.label.toLowerCase().includes('back') ||
-            cam.label.toLowerCase().includes('rear') ||
-            cam.label.toLowerCase().includes('trasera')
-        ) || cameras[cameras.length - 1];
+        // Mostrar TODAS las cámaras disponibles para debug
+        console.log('═══ CÁMARAS DISPONIBLES ═══');
+        cameras.forEach((cam, index) => {
+            console.log(`[${index}] ID: ${cam.id}`);
+            console.log(`    Label: ${cam.label}`);
+        });
+        console.log('═══════════════════════════');
+        
+        // Buscar cámara TRASERA (back/rear/environment)
+        let backCamera = cameras.find(cam => {
+            const label = cam.label.toLowerCase();
+            return label.includes('back') || 
+                   label.includes('rear') || 
+                   label.includes('trasera') ||
+                   label.includes('environment');
+        });
+        
+        // Si no encuentra por label, usar la ÚLTIMA (suele ser la trasera)
+        if (!backCamera && cameras.length > 1) {
+            backCamera = cameras[cameras.length - 1];
+        }
+        
+        // Si solo hay una cámara, usar esa
+        if (!backCamera) {
+            backCamera = cameras[0];
+        }
         
         addToHistory(`📷 Usando: ${backCamera.label}`, 'info');
-        console.log('Cámara seleccionada:', backCamera);
-        console.log('Todas las cámaras:', cameras);
+        console.log('✓ Cámara seleccionada:', backCamera);
         
         scanner = new Html5Qrcode("reader");
         
@@ -59,9 +78,9 @@ async function startScanner() {
             }
         };
         
-        // Usar el ID de la cámara directamente en lugar de facingMode
+        // Usar el ID de la cámara directamente
         await scanner.start(
-            backCamera.id,  // ← CAMBIO CLAVE: usar ID directo
+            backCamera.id,  // ← Cámara TRASERA
             config,
             onScanSuccess,
             onScanError
