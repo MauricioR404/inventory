@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QR Scanner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    /* Forzar que el video de html5-qrcode ocupe todo el ancho del contenedor */
+    #reader video {
+      width: 100% !important;
+      height: auto !important;
+      display: block !important;
+    }
+    #reader__scan_region {
+      background: transparent !important;
+    }
+    #reader__dashboard {
+      display: none !important;
+    }
+    /* Eliminar bordes internos que agrega la librería */
+    #reader > div:first-child {
+      border: none !important;
+      padding: 0 !important;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-start justify-center py-10 px-4">
+
+  <div class="w-full max-w-md">
+
+    <!-- Header -->
+    <div class="text-center mb-6">
+      <h1 class="text-2xl font-bold text-gray-800">Escáner QR</h1>
+      <p class="text-sm text-gray-500 mt-1">Cámara trasera · Escaneo automático</p>
+    </div>
+
+    <!-- Card -->
+    <div class="bg-white rounded-2xl shadow p-6 space-y-5">
+
+      <!-- Campo: iniciar scan -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Iniciar escaneo
+        </label>
+        <div class="flex gap-2">
+          <input
+            id="scan-input"
+            type="text"
+            readonly
+            placeholder="Haz clic aquí o presiona el botón…"
+            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+          />
+          <button
+            id="start-btn"
+            onclick="startScanner()"
+            class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+              <rect x="7" y="7" width="10" height="10" rx="1"/>
+            </svg>
+            Escanear
+          </button>
+        </div>
+      </div>
+
+      <!-- Viewport cámara -->
+      <!-- Se muestra ANTES de llamar html5QrCode.start() para que la librería pueda medir el div -->
+      <div id="scanner-wrapper" class="hidden space-y-3">
+        <!-- El div #reader es donde html5-qrcode inyecta el video -->
+        <div
+          id="reader"
+          class="w-full rounded-lg overflow-hidden border border-gray-200 bg-black"
+        ></div>
+
+        <button
+          onclick="stopScanner()"
+          class="w-full inline-flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+          </svg>
+          Detener cámara
+        </button>
+      </div>
+
+      <hr class="border-gray-200" />
+
+      <!-- Campo: resultado -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Resultado del escaneo
+        </label>
+        <textarea
+          id="result-output"
+          readonly
+          placeholder="El contenido del código QR aparecerá aquí…"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-gray-50 resize-none h-28 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+        ></textarea>
+
+        <div class="flex items-center justify-between mt-2">
+          <div class="flex items-center gap-2">
+            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-gray-300 transition-colors"></span>
+            <span id="status-text" class="text-xs text-gray-500">En espera</span>
+          </div>
+          <button
+            id="copy-btn"
+            onclick="copyResult()"
+            class="hidden text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            Copiar resultado
+          </button>
+        </div>
+      </div>
+
+      <!-- Contador sesión -->
+      <div class="flex justify-between items-center text-xs text-gray-400 pt-2 border-t border-gray-100">
+        <span>Códigos escaneados esta sesión</span>
+        <span id="count" class="font-semibold text-gray-600">0</span>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let html5QrCode = null;
+    let scanCount   = 0;
+    let isScanning  = false;
+
+    const scanInput      = document.getElementById('scan-input');
+    const resultOut      = document.getElementById('result-output');
+    const startBtn       = document.getElementById('start-btn');
+    const scannerWrapper = document.getElementById('scanner-wrapper');
+    const statusDot      = document.getElementById('status-dot');
+    const statusText     = document.getElementById('status-text');
+    const copyBtn        = document.getElementById('copy-btn');
+    const countEl        = document.getElementById('count');
+
+    function setStatus(state, msg) {
+      const map = {
+        active:  'bg-blue-500',
+        success: 'bg-green-500',
+        error:   'bg-red-500',
+        '':      'bg-gray-300',
+      };
+      statusDot.className = `w-2.5 h-2.5 rounded-full transition-colors ${map[state] ?? 'bg-gray-300'}`;
+      statusText.textContent = msg;
+    }
+
+    async function startScanner() {
+      if (isScanning) return;
+
+      // 1. Mostrar el contenedor del reader ANTES de iniciar la librería
+      //    Si el div está oculto (display:none), html5-qrcode no puede medir su ancho
+      //    y el video no se expande correctamente.
+      scannerWrapper.classList.remove('hidden');
+      startBtn.disabled = true;
+      scanInput.value = 'Iniciando cámara…';
+
+      const config = {
+        fps: 15,
+        qrbox: { width: 240, height: 240 },
+        aspectRatio: 1.333,
+        disableFlip: false,
+      };
+
+      try {
+        html5QrCode = new Html5Qrcode("reader");
+
+        // Intentar cámara trasera directamente con facingMode environment
+        await html5QrCode.start(
+          { facingMode: { exact: "environment" } },
+          config,
+          onScanSuccess,
+          onScanFailure
+        );
+
+        activateUI();
+
+      } catch (primaryErr) {
+        console.warn('facingMode exact falló, intentando fallback…', primaryErr);
+
+        // Fallback: listar dispositivos y elegir la cámara trasera
+        try {
+          const devices = await Html5Qrcode.getCameras();
+          if (!devices || devices.length === 0) throw new Error('No se detectó ninguna cámara.');
+
+          // Buscar por label; si no se encuentra, usar la última de la lista (generalmente trasera en móvil)
+          let cam = devices[devices.length - 1];
+          for (const d of devices) {
+            const lbl = d.label.toLowerCase();
+            if (lbl.includes('back') || lbl.includes('rear') || lbl.includes('trasera') || lbl.includes('environment')) {
+              cam = d;
+              break;
+            }
+          }
+
+          // Crear nueva instancia si la anterior quedó en estado inválido
+          if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+
+          await html5QrCode.start(cam.id, config, onScanSuccess, onScanFailure);
+          activateUI();
+
+        } catch (fallbackErr) {
+          // No se pudo iniciar ninguna cámara
+          scannerWrapper.classList.add('hidden');
+          startBtn.disabled = false;
+          scanInput.value = '';
+          setStatus('error', 'No se pudo acceder a la cámara');
+          console.error('Fallback también falló:', fallbackErr);
+        }
+      }
+    }
+
+    function activateUI() {
+      isScanning = true;
+      startBtn.classList.add('hidden');
+      scanInput.value = 'Cámara activa — apunta al código QR';
+      scanInput.classList.add('ring-2', 'ring-blue-400', 'border-blue-400');
+      setStatus('active', 'Escaneando…');
+    }
+
+    async function stopScanner() {
+      try {
+        if (html5QrCode && isScanning) {
+          await html5QrCode.stop();
+          html5QrCode.clear();
+        }
+      } catch (_) { /* ignorar errores al detener */ }
+
+      html5QrCode  = null;
+      isScanning   = false;
+
+      scannerWrapper.classList.add('hidden');
+      startBtn.classList.remove('hidden');
+      startBtn.disabled = false;
+
+      scanInput.value = '';
+      scanInput.classList.remove('ring-2', 'ring-blue-400', 'border-blue-400');
+
+      if (!resultOut.value) setStatus('', 'En espera');
+    }
+
+    function onScanSuccess(decodedText) {
+      const ts = new Date().toLocaleTimeString('es-SV', { hour12: false });
+      scanCount++;
+      countEl.textContent = scanCount;
+
+      resultOut.value = `[${ts}] ${decodedText}`;
+      resultOut.classList.add('border-green-400', 'ring-2', 'ring-green-200');
+      copyBtn.classList.remove('hidden');
+
+      scanInput.value = '✓ Código detectado';
+      scanInput.classList.remove('ring-2', 'ring-blue-400', 'border-blue-400');
+
+      setStatus('success', 'Código leído correctamente');
+
+      if (navigator.vibrate) navigator.vibrate([80]);
+
+      stopScanner();
+    }
+
+    function onScanFailure() { /* silencioso */ }
+
+    function copyResult() {
+      if (!resultOut.value) return;
+      navigator.clipboard.writeText(resultOut.value).then(() => {
+        const orig = copyBtn.textContent;
+        copyBtn.textContent = '¡Copiado!';
+        setTimeout(() => { copyBtn.textContent = orig; }, 1500);
+      });
+    }
+
+    // Tap en el input también inicia el scanner
+    scanInput.addEventListener('click', () => {
+      if (!isScanning) startScanner();
+    });
+  </script>
+</body>
+</html>
