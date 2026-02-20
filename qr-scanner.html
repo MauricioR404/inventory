@@ -7,23 +7,14 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
   <style>
-    /* Forzar que el video de html5-qrcode ocupe todo el ancho del contenedor */
     #reader video {
       width: 100% !important;
       height: auto !important;
       display: block !important;
     }
-    #reader__scan_region {
-      background: transparent !important;
-    }
-    #reader__dashboard {
-      display: none !important;
-    }
-    /* Eliminar bordes internos que agrega la librería */
-    #reader > div:first-child {
-      border: none !important;
-      padding: 0 !important;
-    }
+    #reader__scan_region { background: transparent !important; }
+    #reader__dashboard { display: none !important; }
+    #reader > div:first-child { border: none !important; padding: 0 !important; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-start justify-center py-10 px-4">
@@ -33,7 +24,7 @@
     <!-- Header -->
     <div class="text-center mb-6">
       <h1 class="text-2xl font-bold text-gray-800">Escáner QR</h1>
-      <p class="text-sm text-gray-500 mt-1">Cámara trasera · Escaneo automático</p>
+      <p class="text-sm text-gray-500 mt-1">Cámara trasera · Alta resolución</p>
     </div>
 
     <!-- Card -->
@@ -41,21 +32,19 @@
 
       <!-- Campo: iniciar scan -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          Iniciar escaneo
-        </label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Iniciar escaneo</label>
         <div class="flex gap-2">
           <input
             id="scan-input"
             type="text"
             readonly
             placeholder="Haz clic aquí o presiona el botón…"
-            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
           />
           <button
             id="start-btn"
             onclick="startScanner()"
-            class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+            class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
@@ -64,17 +53,13 @@
             Escanear
           </button>
         </div>
+        <!-- Info de cámara detectada -->
+        <p id="cam-info" class="hidden text-xs text-gray-400 mt-1.5"></p>
       </div>
 
       <!-- Viewport cámara -->
-      <!-- Se muestra ANTES de llamar html5QrCode.start() para que la librería pueda medir el div -->
       <div id="scanner-wrapper" class="hidden space-y-3">
-        <!-- El div #reader es donde html5-qrcode inyecta el video -->
-        <div
-          id="reader"
-          class="w-full rounded-lg overflow-hidden border border-gray-200 bg-black"
-        ></div>
-
+        <div id="reader" class="w-full rounded-lg overflow-hidden border border-gray-200 bg-black"></div>
         <button
           onclick="stopScanner()"
           class="w-full inline-flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
@@ -90,9 +75,7 @@
 
       <!-- Campo: resultado -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          Resultado del escaneo
-        </label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Resultado del escaneo</label>
         <textarea
           id="result-output"
           readonly
@@ -105,17 +88,13 @@
             <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-gray-300 transition-colors"></span>
             <span id="status-text" class="text-xs text-gray-500">En espera</span>
           </div>
-          <button
-            id="copy-btn"
-            onclick="copyResult()"
-            class="hidden text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
-          >
+          <button id="copy-btn" onclick="copyResult()" class="hidden text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors">
             Copiar resultado
           </button>
         </div>
       </div>
 
-      <!-- Contador sesión -->
+      <!-- Contador -->
       <div class="flex justify-between items-center text-xs text-gray-400 pt-2 border-t border-gray-100">
         <span>Códigos escaneados esta sesión</span>
         <span id="count" class="font-semibold text-gray-600">0</span>
@@ -137,14 +116,10 @@
     const statusText     = document.getElementById('status-text');
     const copyBtn        = document.getElementById('copy-btn');
     const countEl        = document.getElementById('count');
+    const camInfo        = document.getElementById('cam-info');
 
     function setStatus(state, msg) {
-      const map = {
-        active:  'bg-blue-500',
-        success: 'bg-green-500',
-        error:   'bg-red-500',
-        '':      'bg-gray-300',
-      };
+      const map = { active: 'bg-blue-500', success: 'bg-green-500', error: 'bg-red-500', '': 'bg-gray-300' };
       statusDot.className = `w-2.5 h-2.5 rounded-full transition-colors ${map[state] ?? 'bg-gray-300'}`;
       statusText.textContent = msg;
     }
@@ -152,74 +127,76 @@
     async function startScanner() {
       if (isScanning) return;
 
-      // 1. Mostrar el contenedor del reader ANTES de iniciar la librería
-      //    Si el div está oculto (display:none), html5-qrcode no puede medir su ancho
-      //    y el video no se expande correctamente.
+      // Mostrar el wrapper ANTES de iniciar para que html5-qrcode mida el div correctamente
       scannerWrapper.classList.remove('hidden');
       startBtn.disabled = true;
-      scanInput.value = 'Iniciando cámara…';
-
-      const config = {
-        fps: 15,
-        qrbox: { width: 240, height: 240 },
-        aspectRatio: 1.333,
-        disableFlip: false,
-      };
+      scanInput.value = 'Buscando cámara…';
+      camInfo.classList.add('hidden');
 
       try {
-        html5QrCode = new Html5Qrcode("reader");
+        // ─── PASO 1: getCameras() — mismo patrón que usa la demo oficial de scanapp.org ───
+        // Esto nos da el deviceId real de cada cámara física del dispositivo.
+        // Es más confiable que facingMode porque apunta directamente al hardware,
+        // lo que permite además pedir alta resolución sin conflictos con videoConstraints.
+        const devices = await Html5Qrcode.getCameras();
+        if (!devices || devices.length === 0) throw new Error('No se detectó ninguna cámara');
 
-        // Intentar cámara trasera directamente con facingMode environment
+        // ─── PASO 2: Seleccionar Camera 0 / cámara trasera principal ───
+        // En móviles Android e iOS, devices[0] suele ser la cámara trasera principal
+        // (la de mayor resolución). Buscamos también por label como respaldo.
+        let cam = devices[0];
+        for (const d of devices) {
+          const lbl = d.label.toLowerCase();
+          if (lbl.includes('back') || lbl.includes('rear') || lbl.includes('trasera')) {
+            cam = d;
+            break;
+          }
+        }
+
+        // Mostrar info de la cámara elegida
+        camInfo.textContent = `📷 ${cam.label || 'Camera ' + devices.indexOf(cam)}`;
+        camInfo.classList.remove('hidden');
+
+        // ─── PASO 3: Config con deviceId + videoConstraints de alta resolución ───
+        // Pasar deviceId como primer argumento Y dentro de videoConstraints
+        // es el enfoque más estable según la documentación y el código fuente.
+        // "ideal" le dice al browser: quiero esto, acepta lo más cercano posible.
+        const config = {
+          fps: 15,
+          qrbox: (w, h) => {
+            const size = Math.floor(Math.min(w, h) * 0.7);
+            return { width: size, height: size };
+          },
+          disableFlip: false,
+          videoConstraints: {
+            deviceId: { exact: cam.id },
+            width:    { min: 640, ideal: 1920, max: 3840 },
+            height:   { min: 480, ideal: 1080, max: 2160 },
+          }
+        };
+
+        html5QrCode = new Html5Qrcode("reader");
         await html5QrCode.start(
-          { facingMode: { exact: "environment" } },
+          { deviceId: { exact: cam.id } },
           config,
           onScanSuccess,
           onScanFailure
         );
 
-        activateUI();
+        isScanning = true;
+        startBtn.classList.add('hidden');
+        scanInput.value = 'Cámara activa — apunta al código QR';
+        scanInput.classList.add('ring-2', 'ring-blue-400', 'border-blue-400');
+        setStatus('active', 'Escaneando…');
 
-      } catch (primaryErr) {
-        console.warn('facingMode exact falló, intentando fallback…', primaryErr);
-
-        // Fallback: listar dispositivos y elegir la cámara trasera
-        try {
-          const devices = await Html5Qrcode.getCameras();
-          if (!devices || devices.length === 0) throw new Error('No se detectó ninguna cámara.');
-
-          // Buscar por label; si no se encuentra, usar la última de la lista (generalmente trasera en móvil)
-          let cam = devices[devices.length - 1];
-          for (const d of devices) {
-            const lbl = d.label.toLowerCase();
-            if (lbl.includes('back') || lbl.includes('rear') || lbl.includes('trasera') || lbl.includes('environment')) {
-              cam = d;
-              break;
-            }
-          }
-
-          // Crear nueva instancia si la anterior quedó en estado inválido
-          if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-
-          await html5QrCode.start(cam.id, config, onScanSuccess, onScanFailure);
-          activateUI();
-
-        } catch (fallbackErr) {
-          // No se pudo iniciar ninguna cámara
-          scannerWrapper.classList.add('hidden');
-          startBtn.disabled = false;
-          scanInput.value = '';
-          setStatus('error', 'No se pudo acceder a la cámara');
-          console.error('Fallback también falló:', fallbackErr);
-        }
+      } catch (err) {
+        console.error('Error al iniciar cámara:', err);
+        scannerWrapper.classList.add('hidden');
+        startBtn.disabled = false;
+        scanInput.value = '';
+        camInfo.classList.add('hidden');
+        setStatus('error', 'No se pudo acceder a la cámara');
       }
-    }
-
-    function activateUI() {
-      isScanning = true;
-      startBtn.classList.add('hidden');
-      scanInput.value = 'Cámara activa — apunta al código QR';
-      scanInput.classList.add('ring-2', 'ring-blue-400', 'border-blue-400');
-      setStatus('active', 'Escaneando…');
     }
 
     async function stopScanner() {
@@ -228,18 +205,15 @@
           await html5QrCode.stop();
           html5QrCode.clear();
         }
-      } catch (_) { /* ignorar errores al detener */ }
+      } catch (_) {}
 
       html5QrCode  = null;
       isScanning   = false;
-
       scannerWrapper.classList.add('hidden');
       startBtn.classList.remove('hidden');
       startBtn.disabled = false;
-
       scanInput.value = '';
       scanInput.classList.remove('ring-2', 'ring-blue-400', 'border-blue-400');
-
       if (!resultOut.value) setStatus('', 'En espera');
     }
 
@@ -251,14 +225,10 @@
       resultOut.value = `[${ts}] ${decodedText}`;
       resultOut.classList.add('border-green-400', 'ring-2', 'ring-green-200');
       copyBtn.classList.remove('hidden');
-
       scanInput.value = '✓ Código detectado';
-      scanInput.classList.remove('ring-2', 'ring-blue-400', 'border-blue-400');
-
       setStatus('success', 'Código leído correctamente');
 
       if (navigator.vibrate) navigator.vibrate([80]);
-
       stopScanner();
     }
 
@@ -267,16 +237,12 @@
     function copyResult() {
       if (!resultOut.value) return;
       navigator.clipboard.writeText(resultOut.value).then(() => {
-        const orig = copyBtn.textContent;
         copyBtn.textContent = '¡Copiado!';
-        setTimeout(() => { copyBtn.textContent = orig; }, 1500);
+        setTimeout(() => { copyBtn.textContent = 'Copiar resultado'; }, 1500);
       });
     }
 
-    // Tap en el input también inicia el scanner
-    scanInput.addEventListener('click', () => {
-      if (!isScanning) startScanner();
-    });
+    scanInput.addEventListener('click', () => { if (!isScanning) startScanner(); });
   </script>
 </body>
 </html>
